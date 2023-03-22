@@ -84,7 +84,8 @@ def is_comet_available():
 
 
 def is_tensorboard_available():
-    return importlib.util.find_spec("tensorboard") is not None or importlib.util.find_spec("tensorboardX") is not None
+    return False
+    # return importlib.util.find_spec("tensorboard") is not None or importlib.util.find_spec("tensorboardX") is not None
 
 
 def is_optuna_available():

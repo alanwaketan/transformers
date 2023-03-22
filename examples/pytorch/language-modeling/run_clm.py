@@ -28,6 +28,7 @@ import sys
 from dataclasses import dataclass, field
 from itertools import chain
 from typing import Optional
+import torch_xla.debug.profiler as xp
 
 import datasets
 import evaluate
@@ -257,6 +258,8 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
     logger.info(f"Training/evaluation parameters {training_args}")
+    server = xp.start_server(9229)
+    logger.info('Profiling server started: {str(server)}')
 
     # Detecting last checkpoint.
     last_checkpoint = None
