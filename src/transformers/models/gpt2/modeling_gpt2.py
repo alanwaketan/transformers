@@ -344,15 +344,16 @@ class GPT2Attention(nn.Module):
 
 class GPT2MLP(nn.Module):
     def __init__(self, intermediate_size, config):
-        super().__init__()
-        embed_dim = config.hidden_size
-        self.c_fc = Conv1D(intermediate_size, embed_dim)
-        self.c_proj = Conv1D(embed_dim, intermediate_size)
-        self.act = ACT2FN[config.activation_function]
-        self.dropout = nn.Dropout(config.resid_pdrop)
+        with xp.Trace('GPT2MLP init'):
+            super().__init__()
+            embed_dim = config.hidden_size
+            self.c_fc = Conv1D(intermediate_size, embed_dim)
+            self.c_proj = Conv1D(embed_dim, intermediate_size)
+            self.act = ACT2FN[config.activation_function]
+            self.dropout = nn.Dropout(config.resid_pdrop)
 
     def forward(self, hidden_states: Optional[Tuple[torch.FloatTensor]]) -> torch.FloatTensor:
-        with xp.Trace('GPT2MLP'):
+        with xp.Trace('GPT2MLP forward'):
             hidden_states = self.c_fc(hidden_states)
             hidden_states = self.act(hidden_states)
             hidden_states = self.c_proj(hidden_states)
@@ -362,19 +363,20 @@ class GPT2MLP(nn.Module):
 
 class GPT2Block(nn.Module):
     def __init__(self, config, layer_idx=None):
-        super().__init__()
-        hidden_size = config.hidden_size
-        inner_dim = config.n_inner if config.n_inner is not None else 4 * hidden_size
+        with xp.Trace('GPT2Block init'):
+            super().__init__()
+            hidden_size = config.hidden_size
+            inner_dim = config.n_inner if config.n_inner is not None else 4 * hidden_size
 
-        self.ln_1 = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
-        self.attn = GPT2Attention(config, layer_idx=layer_idx)
-        self.ln_2 = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
+            self.ln_1 = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
+            self.attn = GPT2Attention(config, layer_idx=layer_idx)
+            self.ln_2 = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
 
-        if config.add_cross_attention:
-            self.crossattention = GPT2Attention(config, is_cross_attention=True, layer_idx=layer_idx)
-            self.ln_cross_attn = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
+            if config.add_cross_attention:
+                self.crossattention = GPT2Attention(config, is_cross_attention=True, layer_idx=layer_idx)
+                self.ln_cross_attn = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
 
-        self.mlp = GPT2MLP(inner_dim, config)
+            self.mlp = GPT2MLP(inner_dim, config)
 
     def forward(
         self,
@@ -387,7 +389,7 @@ class GPT2Block(nn.Module):
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
     ) -> Union[Tuple[torch.Tensor], Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]]]:
-        with xp.Trace('GPT2Block'):
+        with xp.Trace('GPT2Block forward'):
             residual = hidden_states
             hidden_states = self.ln_1(hidden_states)
             attn_outputs = self.attn(
@@ -672,24 +674,25 @@ class GPT2Model(GPT2PreTrainedModel):
     _keys_to_ignore_on_load_missing = ["attn.masked_bias"]
 
     def __init__(self, config):
-        super().__init__(config)
+        with xp.Trace('GPT2Model init'):
+            super().__init__(config)
 
-        self.embed_dim = config.hidden_size
+            self.embed_dim = config.hidden_size
 
-        self.wte = nn.Embedding(config.vocab_size, self.embed_dim)
-        self.wpe = nn.Embedding(config.max_position_embeddings, self.embed_dim)
+            self.wte = nn.Embedding(config.vocab_size, self.embed_dim)
+            self.wpe = nn.Embedding(config.max_position_embeddings, self.embed_dim)
 
-        self.drop = nn.Dropout(config.embd_pdrop)
-        self.h = nn.ModuleList([GPT2Block(config, layer_idx=i) for i in range(config.num_hidden_layers)])
-        self.ln_f = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_epsilon)
+            self.drop = nn.Dropout(config.embd_pdrop)
+            self.h = nn.ModuleList([GPT2Block(config, layer_idx=i) for i in range(config.num_hidden_layers)])
+            self.ln_f = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_epsilon)
 
-        # Model parallel
-        self.model_parallel = False
-        self.device_map = None
-        self.gradient_checkpointing = False
+            # Model parallel
+            self.model_parallel = False
+            self.device_map = None
+            self.gradient_checkpointing = False
 
-        # Initialize weights and apply final processing
-        self.post_init()
+            # Initialize weights and apply final processing
+            self.post_init()
 
     @add_start_docstrings(PARALLELIZE_DOCSTRING)
     def parallelize(self, device_map=None):
@@ -770,7 +773,7 @@ class GPT2Model(GPT2PreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
-        with xp.Trace('GPT2Model'):
+        with xp.Trace('GPT2Model forward'):
             output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
             output_hidden_states = (
                 output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -961,16 +964,17 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"attn.masked_bias", r"attn.bias", r"lm_head.weight"]
 
     def __init__(self, config):
-        super().__init__(config)
-        self.transformer = GPT2Model(config)
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        with xp.Trace('GPT2LMHeadModel init'):
+            super().__init__(config)
+            self.transformer = GPT2Model(config)
+            self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        # Model parallel
-        self.model_parallel = False
-        self.device_map = None
+            # Model parallel
+            self.model_parallel = False
+            self.device_map = None
 
-        # Initialize weights and apply final processing
-        self.post_init()
+            # Initialize weights and apply final processing
+            self.post_init()
 
     @add_start_docstrings(PARALLELIZE_DOCSTRING)
     def parallelize(self, device_map=None):
@@ -1069,7 +1073,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, CausalLMOutputWithCrossAttentions]:
-        with xp.Trace('GPT2LMHeadModel'):
+        with xp.Trace('GPT2LMHeadModel forward'):
             r"""
             labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
                 Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set
@@ -1504,6 +1508,7 @@ class GPT2ForSequenceClassification(GPT2PreTrainedModel):
 )
 class GPT2ForTokenClassification(GPT2PreTrainedModel):
     def __init__(self, config):
+        with xp.Trace('GPT2ForTokenClassification'):
         super().__init__(config)
         self.num_labels = config.num_labels
 
