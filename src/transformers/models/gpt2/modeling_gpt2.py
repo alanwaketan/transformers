@@ -48,6 +48,8 @@ from ...utils.model_parallel_utils import assert_device_map, get_device_map
 from .configuration_gpt2 import GPT2Config
 
 import torch_xla.debug.profiler as xp
+import traceback
+import torch_xla.core.xla_model as xm
 
 logger = logging.get_logger(__name__)
 
@@ -1080,6 +1082,9 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
                 `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
                 are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
             """
+            # for line in traceback.format_stack():
+            #     xm.master_print(line.strip())
+
             return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
             transformer_outputs = self.transformer(
@@ -1508,7 +1513,6 @@ class GPT2ForSequenceClassification(GPT2PreTrainedModel):
 )
 class GPT2ForTokenClassification(GPT2PreTrainedModel):
     def __init__(self, config):
-        with xp.Trace('GPT2ForTokenClassification'):
         super().__init__(config)
         self.num_labels = config.num_labels
 

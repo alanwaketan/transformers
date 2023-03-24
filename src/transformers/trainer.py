@@ -1869,6 +1869,9 @@ class Trainer:
             step = -1
             for step, inputs in enumerate(epoch_iterator):
                 with xp.StepTrace('train_loop', step_num=step):
+                    # if step > 0:
+                    #     break
+
                     if rng_to_sync:
                         self._load_rng_state(resume_from_checkpoint)
                         rng_to_sync = False
@@ -2634,6 +2637,12 @@ class Trainer:
         """
         model.train()
         inputs = self._prepare_inputs(inputs)
+        # for key in inputs:
+        #     value = inputs[key]
+        #     if isinstance(value, torch.Tensor):
+        #         xm.master_print(f"{key}: {value.size()}")
+        #     else:
+        #         xm.master_print(key, value)
 
         if is_sagemaker_mp_enabled():
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
